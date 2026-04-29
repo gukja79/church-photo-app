@@ -1,0 +1,56 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# 윈도우
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 로그/임시 파일
+*.log
+*.tmp
+*.swp
+*~
+/tmp/
+tmp/
+
+# Node (혹시 모를 경우)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# IDE / 에디터
+.vscode/
+.idea/
+*.iml
+.history/
+.project
+.classpath
+
+# 환경 변수 / 비밀
+.env
+.env.*
+*.pem
+*.key
+secrets.json
+local.config.js
+
+# 빌드 산출물 (혹시 모를 경우)
+dist/
+build/
+*.min.js.map
+
+# 자동 생성된 PWA 캐시 (5단계에서 SW 도입 후)
+sw-cache/
+
+# 개인 스크래치 파일
+scratch/
+draft/
+notes-private.md

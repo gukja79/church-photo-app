@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#3b82f6" />
+  <title>서울고 교실 사진</title>
+
+  <!-- 폰트: Nanum Gothic -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <!-- ============== PIN 입력 화면 ============== -->
+  <section id="screen-pin" class="screen hidden">
+    <div class="pin-container">
+      <h1 class="pin-title">서울고 교실 사진</h1>
+      <p class="pin-subtitle">PIN을 입력하세요</p>
+      <div id="pin-display" class="pin-display">
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+      </div>
+      <p id="pin-message" class="pin-message"></p>
+      <div class="pin-keypad">
+        <button type="button" class="pin-key" data-pin-digit="1">1</button>
+        <button type="button" class="pin-key" data-pin-digit="2">2</button>
+        <button type="button" class="pin-key" data-pin-digit="3">3</button>
+        <button type="button" class="pin-key" data-pin-digit="4">4</button>
+        <button type="button" class="pin-key" data-pin-digit="5">5</button>
+        <button type="button" class="pin-key" data-pin-digit="6">6</button>
+        <button type="button" class="pin-key" data-pin-digit="7">7</button>
+        <button type="button" class="pin-key" data-pin-digit="8">8</button>
+        <button type="button" class="pin-key" data-pin-digit="9">9</button>
+        <span class="pin-key-spacer"></span>
+        <button type="button" class="pin-key" data-pin-digit="0">0</button>
+        <button type="button" class="pin-key pin-key-action" data-pin-action="backspace" aria-label="지우기">⌫</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== 메인 화면: 장소 선택 ============== -->
+  <section id="screen-home" class="screen hidden">
+    <header class="app-header home-header">
+      <div class="header-titles">
+        <h1>서울고 교실 사진</h1>
+        <p class="today" id="today-label"></p>
+      </div>
+      <button class="icon-btn" data-action="logout" aria-label="로그아웃" title="로그아웃">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
+    </header>
+
+    <main id="floors-container" class="floors-container">
+      <!-- JS가 층별 섹션을 렌더링 -->
+    </main>
+  </section>
+
+  <!-- ============== 장소 상세 화면 ============== -->
+  <section id="screen-location" class="screen hidden">
+    <header class="app-header with-back">
+      <button class="back-btn" data-action="back-to-home" aria-label="뒤로가기">←</button>
+      <div class="header-titles">
+        <h1 id="location-title">장소</h1>
+        <p class="subtitle" id="location-subtitle">층</p>
+      </div>
+    </header>
+
+    <main class="location-main">
+      <div class="phase-buttons">
+        <button class="phase-btn before" data-phase="before">
+          <span class="phase-label">모임 전 사진 찍기</span>
+          <span class="phase-icon">📷</span>
+        </button>
+        <button class="phase-btn after" data-phase="after">
+          <span class="phase-label">모임 후 사진 찍기</span>
+          <span class="phase-icon">📸</span>
+        </button>
+      </div>
+
+      <section class="today-uploads" aria-labelledby="today-uploads-title">
+        <header class="today-uploads-header">
+          <h2 id="today-uploads-title">오늘 업로드된 사진</h2>
+          <button type="button" class="link-btn" data-action="refresh-photos" aria-label="새로고침" title="새로고침">↻</button>
+        </header>
+
+        <div class="photo-group" id="photo-group-before">
+          <h3>모임 전 <span class="count" id="count-before">0</span></h3>
+          <div class="photo-grid" id="grid-before"></div>
+          <p class="empty-hint" id="empty-before">아직 사진이 없습니다.</p>
+        </div>
+
+        <div class="photo-group" id="photo-group-after">
+          <h3>모임 후 <span class="count" id="count-after">0</span></h3>
+          <div class="photo-grid" id="grid-after"></div>
+          <p class="empty-hint" id="empty-after">아직 사진이 없습니다.</p>
+        </div>
+      </section>
+    </main>
+  </section>
+
+  <!-- ============== 라이트박스 (전체화면 사진 보기) ============== -->
+  <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="사진 보기">
+    <button type="button" class="lightbox-close" data-action="lightbox-close" aria-label="닫기">✕</button>
+    <button type="button" class="lightbox-nav lightbox-prev" data-action="lightbox-prev" aria-label="이전">‹</button>
+    <button type="button" class="lightbox-nav lightbox-next" data-action="lightbox-next" aria-label="다음">›</button>
+    <div class="lightbox-stage">
+      <img id="lightbox-img" alt="" />
+      <div id="lightbox-loading" class="lightbox-loading hidden">불러오는 중…</div>
+    </div>
+    <div class="lightbox-info">
+      <span id="lightbox-meta"></span>
+      <button type="button" class="lightbox-delete" data-action="lightbox-delete" aria-label="삭제">🗑 삭제</button>
+    </div>
+  </div>
+
+  <!-- ============== 사진 촬영/미리보기 화면 ============== -->
+  <section id="screen-camera" class="screen hidden">
+    <header class="app-header with-back">
+      <button class="back-btn" data-action="back-to-location" aria-label="뒤로가기">←</button>
+      <div class="header-titles">
+        <h1 id="camera-title">사진 찍기</h1>
+        <p class="subtitle" id="camera-subtitle"></p>
+      </div>
+    </header>
+
+    <main class="camera-main">
+      <!-- 모바일 카메라 직접 호출용 (숨김 input) -->
+      <input
+        type="file"
+        id="file-input"
+        accept="image/*"
+        capture="environment"
+        multiple
+        hidden
+      />
+
+      <div id="preview-empty" class="preview-empty">
+        <div class="empty-icon">📷</div>
+        <p>아직 선택한 사진이 없습니다.</p>
+        <button class="primary-btn" data-action="open-camera">
+          카메라로 사진 찍기
+        </button>
+      </div>
+
+      <div id="preview-grid" class="preview-grid hidden">
+        <!-- 썸네일 카드들 -->
+      </div>
+
+      <button id="add-more-btn" class="add-more-btn hidden" data-action="open-camera">
+        + 사진 더 찍기
+      </button>
+    </main>
+
+    <footer id="upload-footer" class="upload-footer hidden">
+      <button id="upload-btn" class="upload-btn">
+        <span id="upload-btn-label">사진 0장 업로드</span>
+      </button>
+    </footer>
+  </section>
+
+  <script src="./js/camera.js"></script>
+  <script src="./js/auth.js"></script>
+  <script src="./js/api.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
