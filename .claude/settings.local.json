@@ -9,7 +9,8 @@
       "Bash(/usr/bin/curl -sS -o /dev/null -w '%{http_code}' http://localhost:8080/__TRACKED_VAR__)",
       "Bash(/usr/bin/curl *)",
       "Bash(node --check /Users/nomad_g/Desktop/church-photo-app/js/app.js)",
-      "Bash(node --check /Users/nomad_g/Desktop/church-photo-app/js/api.js)"
+      "Bash(node --check /Users/nomad_g/Desktop/church-photo-app/js/api.js)",
+      "Bash(node *)"
     ]
   }
 }

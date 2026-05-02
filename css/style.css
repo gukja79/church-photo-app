@@ -32,6 +32,13 @@
   --shadow-card:  0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px rgba(15, 23, 42, 0.06);
   --shadow-lift:  0 2px 4px rgba(15, 23, 42, 0.06), 0 12px 28px rgba(15, 23, 42, 0.10);
 
+  /* 메모 (라이트 모드: 부드러운 노랑) */
+  --color-memo-bg:     #fef3c7;
+  --color-memo-border: #f59e0b;
+  --color-memo-text:   #78350f;
+  --color-memo-time:   #b45309;
+  --color-memo-dot:    #f59e0b;
+
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 20px;
@@ -64,6 +71,13 @@
     --shadow-sm:    0 1px 2px rgba(0,0,0,0.35);
     --shadow-card:  0 1px 2px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.35);
     --shadow-lift:  0 2px 4px rgba(0,0,0,0.5), 0 12px 28px rgba(0,0,0,0.45);
+
+    /* 메모 (다크 모드: 깊은 갈색 톤 + 강한 노랑) */
+    --color-memo-bg:     #3d3520;
+    --color-memo-border: #fbbf24;
+    --color-memo-text:   #ffffff;
+    --color-memo-time:   #fbbf24;
+    --color-memo-dot:    #fbbf24;
   }
 }
 
@@ -241,6 +255,7 @@ body {
 }
 
 .location-card {
+  position: relative;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -959,6 +974,200 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ============== 메모 기능 ============== */
+
+/* 홈 카드 dots 행에 추가되는 메모 점. Before/After 점과 같은 .dot 크기(10px) 공유. */
+.dot.memo-done {
+  background: var(--color-memo-dot);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-memo-dot) 22%, transparent);
+}
+
+/* 홈 하단 범례 */
+.home-legend {
+  padding: 8px 16px calc(16px + env(safe-area-inset-bottom));
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--color-text-soft);
+}
+.home-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.home-legend .legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.home-legend .legend-memo-dot {
+  background: var(--color-memo-dot);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-memo-dot) 22%, transparent);
+}
+
+/* 장소 상세 메모 카드 영역 */
+.memo-card-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.memo-card-area.hidden { display: none !important; }
+
+.memo-card {
+  position: relative;
+  background: var(--color-memo-bg);
+  border-left: 3px solid var(--color-memo-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 44px 10px 12px; /* 우측은 삭제 버튼 자리 */
+  font-size: 14px;
+  line-height: 1.5;
+  /* 카드 등장 미세 페이드 */
+  animation: memo-fade-in 200ms ease;
+}
+@keyframes memo-fade-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.memo-card .memo-time {
+  /* 인라인이라 텍스트와 한 줄에 흐름. 길어지면 텍스트가 다음 줄로 자연스럽게 wrap.
+     margin-right로 시간/본문 사이 간격을 만든다. */
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-memo-time);
+  letter-spacing: 0.2px;
+  margin-right: 10px;
+}
+.memo-card .memo-text {
+  color: var(--color-memo-text);
+  word-break: break-word;
+}
+.memo-delete-btn {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--color-memo-time);
+  font-size: 16px;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 120ms ease, transform 100ms ease;
+}
+.memo-delete-btn:active {
+  background: color-mix(in srgb, var(--color-memo-border) 22%, transparent);
+  transform: translateY(-50%) scale(0.92);
+}
+
+/* 장소 상세 메모 추가 버튼 (점선 보조 버튼) */
+.memo-add-btn {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: 2px dashed var(--color-memo-border);
+  color: var(--color-memo-time);
+  border-radius: var(--radius-md);
+  padding: 14px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 120ms ease, transform 100ms ease;
+}
+.memo-add-btn:active {
+  background: color-mix(in srgb, var(--color-memo-border) 14%, transparent);
+  transform: scale(0.98);
+}
+
+/* 메모 추가 화면 */
+.memo-add-main {
+  flex: 1;
+  padding: 20px 16px 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.memo-add-textarea {
+  width: 100%;
+  min-height: 180px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  resize: vertical;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.memo-add-textarea:focus {
+  outline: none;
+  border-color: var(--color-memo-border);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-memo-border) 22%, transparent);
+}
+.memo-add-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.memo-add-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border-soft);
+  z-index: 20;
+  display: flex;
+  gap: 10px;
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
+}
+.memo-cancel-btn,
+.memo-save-btn {
+  flex: 1;
+  min-height: 52px;
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 100ms ease, background-color 120ms ease, opacity 120ms ease;
+}
+.memo-cancel-btn {
+  background: var(--color-surface-soft);
+  color: var(--color-text-soft);
+  border: 1px solid var(--color-border);
+}
+.memo-cancel-btn:active {
+  transform: scale(0.98);
+}
+.memo-save-btn {
+  background: var(--color-memo-border);
+  color: #ffffff;
+  border: none;
+  box-shadow: var(--shadow-card);
+}
+.memo-save-btn:active:not(:disabled) {
+  transform: scale(0.98);
+  filter: brightness(0.95);
+}
+.memo-save-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* ============== 작은 폰 (iPhone SE 등) 보정 ============== */

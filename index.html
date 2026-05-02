@@ -63,6 +63,13 @@
     <main id="floors-container" class="floors-container">
       <!-- JS가 층별 섹션을 렌더링 -->
     </main>
+
+    <footer class="home-legend" aria-label="범례">
+      <span class="legend-item">
+        <span class="legend-dot legend-memo-dot" aria-hidden="true"></span>
+        메모 있음
+      </span>
+    </footer>
   </section>
 
   <!-- ============== 장소 상세 화면 ============== -->
@@ -76,6 +83,10 @@
     </header>
 
     <main class="location-main">
+      <section id="memo-card-area" class="memo-card-area hidden" aria-label="교실 메모">
+        <!-- JS가 메모 라인을 렌더링 -->
+      </section>
+
       <div class="phase-buttons">
         <button class="phase-btn before" data-phase="before">
           <span class="phase-label">모임 전 사진 찍기</span>
@@ -86,6 +97,10 @@
           <span class="phase-icon">📸</span>
         </button>
       </div>
+
+      <button type="button" class="memo-add-btn" data-action="open-memo-add">
+        ✏️ 메모 추가
+      </button>
 
       <section class="today-uploads" aria-labelledby="today-uploads-title">
         <header class="today-uploads-header">
@@ -122,6 +137,33 @@
       <button type="button" class="lightbox-delete" data-action="lightbox-delete" aria-label="삭제">🗑 삭제</button>
     </div>
   </div>
+
+  <!-- ============== 메모 추가 화면 ============== -->
+  <section id="screen-memo-add" class="screen hidden">
+    <header class="app-header with-back">
+      <button class="back-btn" data-action="back-from-memo-add" aria-label="뒤로가기">←</button>
+      <div class="header-titles">
+        <h1 id="memo-add-title">메모 추가</h1>
+        <p class="subtitle" id="memo-add-subtitle"></p>
+      </div>
+    </header>
+
+    <main class="memo-add-main">
+      <textarea
+        id="memo-add-textarea"
+        class="memo-add-textarea"
+        placeholder="이 교실에 남길 메모를 적어주세요. (예: 책상 흔들림, 의자 부족 등)"
+        rows="6"
+        maxlength="500"
+      ></textarea>
+      <p class="memo-add-hint">저장 시 시간 정보가 자동으로 추가됩니다.</p>
+    </main>
+
+    <footer class="memo-add-footer">
+      <button type="button" class="memo-cancel-btn" data-action="cancel-memo-add">취소</button>
+      <button type="button" class="memo-save-btn" data-action="save-memo">저장</button>
+    </footer>
+  </section>
 
   <!-- ============== 사진 촬영/미리보기 화면 ============== -->
   <section id="screen-camera" class="screen hidden">

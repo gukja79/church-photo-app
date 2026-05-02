@@ -155,6 +155,35 @@ const Api = (() => {
     });
   }
 
+  // ---------- 메모 ----------
+  // 모든 교실의 메모 존재 여부 일괄 조회 (홈 진입 시 사용)
+  async function getMemoStatus(date) {
+    const res = await getJSON({ action: 'getMemoStatus', date });
+    if (!res.success) throw new Error(res.error || '메모 상태 조회 실패');
+    return res; // { success, date, memos: { folderName: true, ... } }
+  }
+
+  // 특정 교실의 메모 라인 배열
+  async function getMemos(date, location) {
+    const res = await getJSON({ action: 'getMemos', date, location });
+    if (!res.success) throw new Error(res.error || '메모 조회 실패');
+    return res; // { success, date, location, lines: [...] }
+  }
+
+  // 메모 한 줄 append. text는 '[YYYY-MM-DD HH:MM] 본문' 형식 (프론트에서 만들어 보냄).
+  async function addMemo(date, location, text) {
+    const res = await postJSON({ action: 'addMemo', date, location, text });
+    if (!res.success) throw new Error(res.error || '메모 저장 실패');
+    return res;
+  }
+
+  // 메모 한 줄 삭제 (정확히 일치하는 첫 줄)
+  async function deleteMemo(date, location, lineText) {
+    const res = await postJSON({ action: 'deleteMemo', date, location, lineText });
+    if (!res.success) throw new Error(res.error || '메모 삭제 실패');
+    return res;
+  }
+
   // ---------- PIN 인증 (토큰 발급) ----------
   // auth는 토큰 첨부 X. 서버가 PIN으로 직접 검증.
   async function auth(pin) {
@@ -170,6 +199,7 @@ const Api = (() => {
   return {
     uploadPhoto, getStatus, listPhotos, deletePhoto,
     getPhotoBlobUrl, clearPhotoCache, removeFromPhotoCache,
+    getMemoStatus, getMemos, addMemo, deleteMemo,
     auth, ping, getApiUrl,
   };
 })();

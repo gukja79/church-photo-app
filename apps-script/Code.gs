@@ -6,11 +6,15 @@
  *   - GET  ?action=status&date=...&token=...                  : 특정 날짜 업로드 현황
  *   - GET  ?action=listPhotos&date=...&folderName=...&token=  : 장소 폴더의 사진 메타 목록
  *   - GET  ?action=getPhoto&fileId=...&size=thumb|full&token  : 사진 바이너리(JSON+base64)
+ *   - GET  ?action=getMemoStatus&date=...&token=              : 모든 교실의 메모 존재 여부 일괄 조회
+ *   - GET  ?action=getMemos&date=...&location=...&token=      : 특정 교실의 메모 라인 배열
  *   - POST {action: 'auth',   pin}                            : PIN 검증 → 토큰 발급
  *   - POST {action: 'upload', token, ...}                     : 사진 업로드 (토큰 필수)
  *   - POST {action: 'status', token, date}                    : 업로드 현황 (POST로도 가능)
  *   - POST {action: 'listPhotos', token, date, folderName}    : 사진 목록 (POST로도 가능)
  *   - POST {action: 'deletePhoto', token, fileId}             : 사진 1장 휴지통 이동
+ *   - POST {action: 'addMemo', token, date, location, text}   : 메모 한 줄 append (LockService)
+ *   - POST {action: 'deleteMemo', token, date, location, lineText} : 메모 한 줄 삭제 (LockService)
  *
  * 폴더 구조 (부모 폴더 아래):
  *   YYYY-MM-DD/{folderName}/{filename}.jpg
@@ -54,6 +58,8 @@ function doPost(e) {
     if (action === 'status')      return jsonResponse(handleStatus(body.date));
     if (action === 'listPhotos')  return jsonResponse(handleListPhotos(body.date, body.folderName));
     if (action === 'deletePhoto') return jsonResponse(handleDeletePhoto(body.fileId));
+    if (action === 'addMemo')     return jsonResponse(handleAddMemo(body.date, body.location, body.text));
+    if (action === 'deleteMemo')  return jsonResponse(handleDeleteMemo(body.date, body.location, body.lineText));
 
     return jsonResponse({ success: false, error: '알 수 없는 action: ' + action });
   } catch (err) {
@@ -81,9 +87,11 @@ function doGet(e) {
       return jsonResponse({ success: false, error: '인증이 필요합니다', code: 'AUTH_REQUIRED' });
     }
 
-    if (action === 'status')     return jsonResponse(handleStatus(params.date));
-    if (action === 'listPhotos') return jsonResponse(handleListPhotos(params.date, params.folderName));
-    if (action === 'getPhoto')   return jsonResponse(handleGetPhoto(params.fileId, params.size));
+    if (action === 'status')        return jsonResponse(handleStatus(params.date));
+    if (action === 'listPhotos')    return jsonResponse(handleListPhotos(params.date, params.folderName));
+    if (action === 'getPhoto')      return jsonResponse(handleGetPhoto(params.fileId, params.size));
+    if (action === 'getMemoStatus') return jsonResponse(handleGetMemoStatus(params.date));
+    if (action === 'getMemos')      return jsonResponse(handleGetMemos(params.date, params.location));
 
     return jsonResponse({ success: false, error: '알 수 없는 action: ' + action });
   } catch (err) {
@@ -397,6 +405,188 @@ function handleStatus(date) {
     locations[f.getName()] = countPhasesInFolder_(f);
   }
   return { success: true, date: date, locations: locations };
+}
+
+// ===== 메모 =====
+//
+// 각 교실 폴더 안에 '메모.txt' 파일로 누적 저장.
+//   파일 경로:  PARENT/{date}/{location}/메모.txt
+//   파일 형식:  각 줄 = '[YYYY-MM-DD HH:MM] 본문' (본문 내 줄바꿈은 프론트에서 ' / '로 치환됨)
+//   각 줄 끝에 '\n' 1개. 마지막 줄도 '\n'으로 끝남.
+//
+// 동시성: addMemo / deleteMemo는 LockService로 직렬화한다.
+//   - 자원봉사자가 동시에 메모를 남기는 경우는 흔치 않지만, 같은 교실에 동시에 들어가
+//     append 하면 read-modify-write race로 한 줄이 유실될 수 있음.
+
+var MEMO_FILENAME = '메모.txt';
+
+/**
+ * 모든 교실의 메모 존재 여부 일괄 조회.
+ * 입력: date (YYYY-MM-DD)
+ * 출력: { success, date, memos: { '01_2층_1-14': true, ... } }
+ *   - 폴더 없거나 메모.txt 없으면 키 자체를 넣지 않음 (프론트는 truthy 체크만)
+ */
+function handleGetMemoStatus(date) {
+  if (!date) return { success: false, error: 'date 파라미터가 필요합니다.' };
+
+  var parentId = getProp_('PARENT_FOLDER_ID');
+  if (!parentId) return { success: false, error: 'PARENT_FOLDER_ID 미설정' };
+
+  var root = DriveApp.getFolderById(parentId);
+  var dateIt = root.getFoldersByName(date);
+  if (!dateIt.hasNext()) {
+    return { success: true, date: date, memos: {} };
+  }
+
+  var dateFolder = dateIt.next();
+  var memos = {};
+  var folderIt = dateFolder.getFolders();
+  while (folderIt.hasNext()) {
+    var f = folderIt.next();
+    if (folderHasMemo_(f)) memos[f.getName()] = true;
+  }
+  return { success: true, date: date, memos: memos };
+}
+
+/**
+ * 특정 교실의 메모 라인 배열 반환.
+ * 입력: date, location (예: '01_2층_1-14')
+ * 출력: { success, date, location, lines: ['[2026-04-29 09:30] 책상 흔들림', ...] }
+ *   - 메모 파일 없으면 lines: []
+ *   - 빈 줄은 무시.
+ */
+function handleGetMemos(date, location) {
+  if (!date)     return { success: false, error: 'date 파라미터가 필요합니다.' };
+  if (!location) return { success: false, error: 'location 파라미터가 필요합니다.' };
+
+  var parentId = getProp_('PARENT_FOLDER_ID');
+  if (!parentId) return { success: false, error: 'PARENT_FOLDER_ID 미설정' };
+
+  var root = DriveApp.getFolderById(parentId);
+  var dateIt = root.getFoldersByName(date);
+  if (!dateIt.hasNext()) return { success: true, date: date, location: location, lines: [] };
+
+  var locIt = dateIt.next().getFoldersByName(location);
+  if (!locIt.hasNext()) return { success: true, date: date, location: location, lines: [] };
+
+  var memoFile = findMemoFile_(locIt.next());
+  if (!memoFile) return { success: true, date: date, location: location, lines: [] };
+
+  var content = memoFile.getBlob().getDataAsString('UTF-8');
+  var lines = content.split('\n').filter(function(s) { return s.length > 0; });
+  return { success: true, date: date, location: location, lines: lines };
+}
+
+/**
+ * 메모 한 줄 append.
+ * 입력: date, location, text (이미 [YYYY-MM-DD HH:MM] 프리픽스 포함, 줄바꿈은 ' / '로 치환되어 옴)
+ *   - 폴더 없으면 생성 (사진 한 장 없이도 메모만 남길 수 있도록)
+ *   - LockService로 read-modify-write 보호
+ */
+function handleAddMemo(date, location, text) {
+  if (!date)     return { success: false, error: 'date 필수' };
+  if (!location) return { success: false, error: 'location 필수' };
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return { success: false, error: '메모 본문이 비어있습니다' };
+  }
+
+  var parentId = getProp_('PARENT_FOLDER_ID');
+  if (!parentId) return { success: false, error: 'PARENT_FOLDER_ID 미설정' };
+
+  // 안전망: 줄바꿈이 들어와도 한 줄로 강제 (프론트에서 ' / ' 치환하지만 이중 안전)
+  var line = String(text).replace(/[\r\n]+/g, ' / ').trim();
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    return { success: false, error: '서버가 바쁩니다. 잠시 후 다시 시도해주세요.', code: 'BUSY' };
+  }
+  try {
+    var root       = DriveApp.getFolderById(parentId);
+    var dateFolder = getOrCreateFolder_(root, date);
+    var locFolder  = getOrCreateFolder_(dateFolder, location);
+
+    var memoFile = findMemoFile_(locFolder);
+    if (memoFile) {
+      var prev = memoFile.getBlob().getDataAsString('UTF-8');
+      // 마지막에 '\n' 보장
+      if (prev.length > 0 && prev.charAt(prev.length - 1) !== '\n') prev += '\n';
+      memoFile.setContent(prev + line + '\n');
+    } else {
+      locFolder.createFile(MEMO_FILENAME, line + '\n', MimeType.PLAIN_TEXT);
+    }
+
+    return { success: true, date: date, location: location, line: line };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 메모 한 줄 삭제 (정확히 일치하는 첫 번째 줄).
+ * 입력: date, location, lineText (정확히 매칭되는 한 줄)
+ *   - 매칭 없어도 success: true (이미 누가 지운 것일 수 있음)
+ *   - 삭제 후 빈 파일이 되면 메모.txt 자체를 휴지통으로 이동
+ *   - LockService 적용
+ */
+function handleDeleteMemo(date, location, lineText) {
+  if (!date)     return { success: false, error: 'date 필수' };
+  if (!location) return { success: false, error: 'location 필수' };
+  if (!lineText) return { success: false, error: 'lineText 필수' };
+
+  var parentId = getProp_('PARENT_FOLDER_ID');
+  if (!parentId) return { success: false, error: 'PARENT_FOLDER_ID 미설정' };
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    return { success: false, error: '서버가 바쁩니다. 잠시 후 다시 시도해주세요.', code: 'BUSY' };
+  }
+  try {
+    var root = DriveApp.getFolderById(parentId);
+    var dateIt = root.getFoldersByName(date);
+    if (!dateIt.hasNext()) return { success: true, removed: false, fileDeleted: false };
+
+    var locIt = dateIt.next().getFoldersByName(location);
+    if (!locIt.hasNext()) return { success: true, removed: false, fileDeleted: false };
+
+    var locFolder = locIt.next();
+    var memoFile  = findMemoFile_(locFolder);
+    if (!memoFile) return { success: true, removed: false, fileDeleted: false };
+
+    var content = memoFile.getBlob().getDataAsString('UTF-8');
+    var lines   = content.split('\n');
+    var removed = false;
+    var kept    = [];
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i];
+      if (ln.length === 0) continue;            // 빈 줄(주로 마지막 trailing newline) 제거
+      if (!removed && ln === lineText) {
+        removed = true;
+        continue;
+      }
+      kept.push(ln);
+    }
+
+    var fileDeleted = false;
+    if (kept.length === 0) {
+      memoFile.setTrashed(true);
+      fileDeleted = true;
+    } else {
+      memoFile.setContent(kept.join('\n') + '\n');
+    }
+
+    return { success: true, removed: removed, fileDeleted: fileDeleted };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function folderHasMemo_(folder) {
+  return folder.getFilesByName(MEMO_FILENAME).hasNext();
+}
+
+function findMemoFile_(folder) {
+  var it = folder.getFilesByName(MEMO_FILENAME);
+  return it.hasNext() ? it.next() : null;
 }
 
 // ===== 인증 / 토큰 =====

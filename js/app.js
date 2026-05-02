@@ -19,6 +19,9 @@ const App = (() => {
     statusMap:       {},
     uploading:       false,
     locationPhotos:  [], // 현재 선택된 장소의 오늘 사진들
+    memoMap:         {}, // 홈용: folderName → true (메모 존재 여부)
+    currentMemos:    [], // 현재 선택된 장소의 메모 라인들 (저장된 순서, 최신이 마지막)
+    memoSaving:      false,
     lightbox: {
       open:   false,
       list:   [],
@@ -80,6 +83,22 @@ const App = (() => {
       }
       console.warn('[status 조회 실패]', err);
       state.statusMap = {};
+    }
+  }
+
+  // 22개 폴더의 메모 존재 여부 일괄 조회 (홈 노란 점 렌더용)
+  async function refreshMemoStatus() {
+    try {
+      if (!Api.getApiUrl()) { state.memoMap = {}; return; }
+      const res = await Api.getMemoStatus(state.today);
+      state.memoMap = res.memos || {};
+    } catch (err) {
+      if (err && err.code === 'AUTH_REQUIRED') {
+        showPinScreen('인증이 만료되었습니다. 다시 로그인해주세요.');
+        throw err;
+      }
+      console.warn('[메모 상태 조회 실패]', err);
+      state.memoMap = {};
     }
   }
 
@@ -200,7 +219,8 @@ const App = (() => {
   async function afterLogin() {
     state.today = Camera.todayKST();
     try {
-      await refreshStatus();
+      // 사진 현황과 메모 현황을 동시에 가져온다 (둘 다 홈 렌더에 필요)
+      await Promise.all([refreshStatus(), refreshMemoStatus()]);
     } catch (err) {
       // refreshStatus에서 AUTH_REQUIRED 시 이미 PIN 화면 복귀 처리됨
       if (err && err.code === 'AUTH_REQUIRED') return;
@@ -232,7 +252,9 @@ const App = (() => {
       grid.className = 'location-grid';
 
       items.forEach((loc) => {
-        const stat = state.statusMap[getFolderName(loc)] || { before: 0, after: 0 };
+        const folderName = getFolderName(loc);
+        const stat = state.statusMap[folderName] || { before: 0, after: 0 };
+        const hasMemo = !!state.memoMap[folderName];
         const card = document.createElement('button');
         card.type = 'button';
         card.className = 'location-card';
@@ -243,6 +265,7 @@ const App = (() => {
           <div class="dots">
             <span class="dot ${stat.before > 0 ? 'before-done' : ''}" title="Before"></span>
             <span class="dot ${stat.after  > 0 ? 'after-done'  : ''}" title="After"></span>
+            ${hasMemo ? '<span class="dot memo-done" title="메모"></span>' : ''}
           </div>
         `;
         card.addEventListener('click', () => onSelectLocation(loc));
@@ -260,9 +283,12 @@ const App = (() => {
     $('#location-title').textContent    = loc.name;
     $('#location-subtitle').textContent = state.floorLabels[loc.floor] || loc.floor;
     state.locationPhotos = [];
+    state.currentMemos   = [];
     renderLocationPhotos();
+    renderMemoCards();
     showScreen('location');
     refreshLocationPhotos();
+    refreshLocationMemos({ silent: true });
   }
 
   // ---------- 오늘 사진 목록 ----------
@@ -437,6 +463,202 @@ const App = (() => {
     }
   }
 
+  // ---------- 메모 ----------
+  // 현재 선택된 장소의 메모 라인을 백엔드에서 받아 state.currentMemos 갱신.
+  // 'silent' 호출은 화면 진입 시처럼 별도 안내가 필요 없을 때.
+  async function refreshLocationMemos({ silent = false } = {}) {
+    if (!state.selected) return;
+    if (!Auth.isAuthenticated()) { showPinScreen('PIN을 다시 입력해주세요.'); return; }
+    try {
+      const res = await Api.getMemos(state.today, getFolderName(state.selected));
+      state.currentMemos = res.lines || [];
+      renderMemoCards();
+    } catch (err) {
+      if (err && err.code === 'AUTH_REQUIRED') {
+        showPinScreen('PIN을 다시 입력해주세요.');
+        return;
+      }
+      console.warn('[메모 조회 실패]', err);
+      if (!silent) alert('메모를 불러오지 못했습니다: ' + (err.message || err));
+    }
+  }
+
+  // 저장된 메모 라인('[YYYY-MM-DD HH:MM] 본문')을 파싱.
+  // 형식이 맞지 않으면 통째로 본문 취급 (구버전/수동 편집 케이스 대비).
+  function parseMemoLine(line) {
+    const m = /^\[(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})\]\s?(.*)$/.exec(line);
+    if (!m) return { ts: null, body: line };
+    return {
+      ts: { yyyy: m[1], mm: m[2], dd: m[3], hh: m[4], mi: m[5] },
+      body: m[6],
+    };
+  }
+
+  // 메모 시간 표시 포맷팅 (KST 기준).
+  //   오늘     → 'HH:MM'
+  //   어제     → '어제'
+  //   올해 내  → 'M/D'
+  //   작년 이전 → 'YYYY/MM/DD'
+  function formatMemoTime(ts) {
+    if (!ts) return '';
+    const todayParts = Camera.todayKST().split('-'); // [yyyy, mm, dd]
+    const todayY = todayParts[0], todayM = todayParts[1], todayD = todayParts[2];
+
+    if (ts.yyyy === todayY && ts.mm === todayM && ts.dd === todayD) {
+      return `${ts.hh}:${ts.mi}`;
+    }
+
+    // '어제' 계산: KST 정오 기준에서 -24시간 → 어제의 KST 날짜 추출
+    // (정오 기준이므로 DST/타임존 경계에서도 안전)
+    const todayKstNoon = new Date(`${todayParts.join('-')}T12:00:00+09:00`);
+    const yKst = Camera.todayKST(new Date(todayKstNoon.getTime() - 24 * 60 * 60 * 1000));
+    if (`${ts.yyyy}-${ts.mm}-${ts.dd}` === yKst) return '어제';
+
+    if (ts.yyyy === todayY) {
+      return `${parseInt(ts.mm, 10)}/${parseInt(ts.dd, 10)}`;
+    }
+    return `${ts.yyyy}/${ts.mm}/${ts.dd}`;
+  }
+
+  // 메모 카드 렌더 (최신 메모가 위로 오도록 역순). 없으면 영역 자체 숨김.
+  function renderMemoCards() {
+    const area = $('#memo-card-area');
+    if (!area) return;
+    if (!state.currentMemos || state.currentMemos.length === 0) {
+      area.classList.add('hidden');
+      area.innerHTML = '';
+      return;
+    }
+    area.classList.remove('hidden');
+    area.innerHTML = '';
+    // 저장 순서가 오래된 → 최신. 화면에는 최신이 위로.
+    const reversed = state.currentMemos.slice().reverse();
+    reversed.forEach((line) => {
+      const { ts, body } = parseMemoLine(line);
+      const card = document.createElement('div');
+      card.className = 'memo-card';
+      const timeLabel = formatMemoTime(ts);
+      // 시간 + 텍스트 한 줄. 텍스트가 길어지면 자연스럽게 wrap (시간은 첫 줄에만 남음).
+      // 본문 안전 표시: textContent로 넣어 XSS 차단
+      const timeEl = document.createElement('span');
+      timeEl.className = 'memo-time';
+      timeEl.textContent = timeLabel;
+      const textEl = document.createElement('span');
+      textEl.className = 'memo-text';
+      textEl.textContent = body;
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'memo-delete-btn';
+      delBtn.setAttribute('aria-label', '메모 삭제');
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', () => onDeleteMemo(line));
+      card.appendChild(timeEl);
+      card.appendChild(textEl);
+      card.appendChild(delBtn);
+      area.appendChild(card);
+    });
+  }
+
+  // [YYYY-MM-DD HH:MM] 형식 (KST). 폴더 날짜와 무관하게 현재 시각으로 찍는다.
+  function makeMemoTimestamp() {
+    const p = Camera.getKstParts ? Camera.getKstParts(new Date()) : null;
+    if (p) return `[${p.yyyy}-${p.mm}-${p.dd} ${p.hh}:${p.mi}]`;
+    // fallback (Camera에 getKstParts 없으면 todayKST + timeKST 조합)
+    const today = Camera.todayKST();
+    const timeRaw = Camera.timeKST(); // 'HHMMSS'
+    return `[${today} ${timeRaw.slice(0, 2)}:${timeRaw.slice(2, 4)}]`;
+  }
+
+  // 메모 추가 화면 진입.
+  function openMemoAddScreen() {
+    if (!state.selected) return;
+    const ta = $('#memo-add-textarea');
+    if (ta) ta.value = '';
+    $('#memo-add-title').textContent    = state.selected.name + ' 메모 추가';
+    $('#memo-add-subtitle').textContent = state.floorLabels[state.selected.floor] || state.selected.floor;
+    state.memoSaving = false;
+    setMemoSaveBusy(false);
+    showScreen('memo-add');
+    // textarea 자동 포커스 (모바일 키보드 즉시 표시)
+    setTimeout(() => { if (ta) ta.focus(); }, 50);
+  }
+
+  function setMemoSaveBusy(busy) {
+    const saveBtn = document.querySelector('.memo-save-btn');
+    const cancelBtn = document.querySelector('.memo-cancel-btn');
+    if (saveBtn) {
+      saveBtn.disabled = busy;
+      saveBtn.textContent = busy ? '저장 중…' : '저장';
+    }
+    if (cancelBtn) cancelBtn.disabled = busy;
+  }
+
+  function cancelMemoAdd() {
+    if (state.memoSaving) return;
+    showScreen('location');
+  }
+
+  async function saveMemo() {
+    if (state.memoSaving) return;
+    if (!state.selected) return;
+    if (!Auth.isAuthenticated()) { showPinScreen('PIN을 다시 입력해주세요.'); return; }
+    const ta = $('#memo-add-textarea');
+    const raw = (ta && ta.value || '').trim();
+    if (!raw) { alert('메모 내용을 입력해주세요.'); return; }
+
+    // 줄바꿈 → ' / ' 치환 (한 줄로 강제)
+    const oneLine = raw.replace(/\s*\r?\n\s*/g, ' / ');
+    const text = `${makeMemoTimestamp()} ${oneLine}`;
+
+    state.memoSaving = true;
+    setMemoSaveBusy(true);
+    try {
+      await Api.addMemo(state.today, getFolderName(state.selected), text);
+      // 로컬 즉시 반영(UX). 그 후 서버 동기화로 최종 일관성 맞추기.
+      state.currentMemos.push(text);
+      state.memoMap[getFolderName(state.selected)] = true;
+      renderMemoCards();
+      showScreen('location');
+      // 백그라운드로 서버 상태 재동기화 (다른 사람이 동시 작성한 경우 반영)
+      refreshLocationMemos({ silent: true }).catch(() => {});
+      refreshMemoStatus().then(() => renderHome()).catch(() => {});
+    } catch (err) {
+      if (err && err.code === 'AUTH_REQUIRED') {
+        showPinScreen('PIN을 다시 입력해주세요.');
+        return;
+      }
+      alert('메모 저장 실패: ' + (err.message || err));
+    } finally {
+      state.memoSaving = false;
+      setMemoSaveBusy(false);
+    }
+  }
+
+  async function onDeleteMemo(lineText) {
+    if (!confirm('이 메모를 삭제할까요?')) return;
+    if (!state.selected) return;
+    try {
+      const res = await Api.deleteMemo(state.today, getFolderName(state.selected), lineText);
+      // 로컬 즉시 반영 (서버에서 삭제 안 됐어도 화면은 한 번 새로 받아서 보정)
+      state.currentMemos = state.currentMemos.filter((l) => l !== lineText);
+      if (state.currentMemos.length === 0) {
+        // 서버에서도 파일 자체가 지워졌으니 홈 메모 점도 사라져야 함
+        delete state.memoMap[getFolderName(state.selected)];
+      } else if (res && res.fileDeleted) {
+        delete state.memoMap[getFolderName(state.selected)];
+      }
+      renderMemoCards();
+      // 홈 카드 노란 점 동기화
+      refreshMemoStatus().then(() => renderHome()).catch(() => {});
+    } catch (err) {
+      if (err && err.code === 'AUTH_REQUIRED') {
+        showPinScreen('PIN을 다시 입력해주세요.');
+        return;
+      }
+      alert('메모 삭제 실패: ' + (err.message || err));
+    }
+  }
+
   function onSelectPhase(phase) {
     state.phase  = phase;
     state.photos = [];
@@ -460,7 +682,7 @@ const App = (() => {
     if (files.length === 0) return;
     for (const file of files) {
       try {
-        const result = await Camera.resize(file, { maxSide: 1920, quality: 0.8 });
+        const result = await Camera.resize(file, { maxSide: 1280, quality: 0.7 });
         state.photos.push({
           id:           uid(),
           blob:         result.blob,
@@ -679,6 +901,8 @@ const App = (() => {
     state.locationPhotos = [];
     state.selected       = null;
     state.photos         = [];
+    state.memoMap        = {};
+    state.currentMemos   = [];
     showPinScreen();
   }
 
@@ -711,6 +935,12 @@ const App = (() => {
         lightboxNext();
       } else if (action === 'lightbox-delete') {
         deleteCurrentPhoto();
+      } else if (action === 'open-memo-add') {
+        openMemoAddScreen();
+      } else if (action === 'cancel-memo-add' || action === 'back-from-memo-add') {
+        cancelMemoAdd();
+      } else if (action === 'save-memo') {
+        saveMemo();
       }
     });
 
