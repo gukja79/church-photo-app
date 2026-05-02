@@ -310,11 +310,11 @@ body {
 }
 .dot.before-done {
   background: var(--color-before);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-before) 22%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-before) 22%, transparent);
 }
 .dot.after-done  {
   background: var(--color-after);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-after) 22%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-after) 22%, transparent);
 }
 
 /* ============== 장소 상세 화면 ============== */
@@ -981,7 +981,7 @@ body {
 /* 홈 카드 dots 행에 추가되는 메모 점. Before/After 점과 같은 .dot 크기(8px) 공유. */
 .dot.memo-done {
   background: var(--color-memo-dot);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-memo-dot) 22%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-memo-dot) 22%, transparent);
 }
 
 /* 홈 하단 범례 */
@@ -1006,7 +1006,7 @@ body {
 }
 .home-legend .legend-memo-dot {
   background: var(--color-memo-dot);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-memo-dot) 22%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-memo-dot) 22%, transparent);
 }
 
 /* 장소 상세 메모 카드 영역 */
