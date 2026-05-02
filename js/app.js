@@ -265,7 +265,7 @@ const App = (() => {
           <div class="dots">
             <span class="dot ${stat.before > 0 ? 'before-done' : ''}" title="Before"></span>
             <span class="dot ${stat.after  > 0 ? 'after-done'  : ''}" title="After"></span>
-            ${hasMemo ? '<span class="dot memo-done" title="메모"></span>' : ''}
+            <span class="dot ${hasMemo ? 'memo-done' : ''}" title="메모"></span>
           </div>
         `;
         card.addEventListener('click', () => onSelectLocation(loc));

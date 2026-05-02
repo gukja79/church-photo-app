@@ -296,13 +296,13 @@ body {
 }
 .location-card .dots {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   margin-top: auto;
   align-items: center;
 }
 .dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--color-border);
   /* 미완료 상태도 살짝 보이도록 inset 그림자 */
@@ -978,7 +978,7 @@ body {
 
 /* ============== 메모 기능 ============== */
 
-/* 홈 카드 dots 행에 추가되는 메모 점. Before/After 점과 같은 .dot 크기(10px) 공유. */
+/* 홈 카드 dots 행에 추가되는 메모 점. Before/After 점과 같은 .dot 크기(8px) 공유. */
 .dot.memo-done {
   background: var(--color-memo-dot);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-memo-dot) 22%, transparent);
@@ -999,8 +999,8 @@ body {
   gap: 6px;
 }
 .home-legend .legend-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   display: inline-block;
 }
