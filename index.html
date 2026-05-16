@@ -89,11 +89,11 @@
 
       <div class="phase-buttons">
         <button class="phase-btn before" data-phase="before">
-          <span class="phase-label">모임 전 사진 찍기</span>
+          <span class="phase-label">모임 전 사진</span>
           <span class="phase-icon">📷</span>
         </button>
         <button class="phase-btn after" data-phase="after">
-          <span class="phase-label">모임 후 사진 찍기</span>
+          <span class="phase-label">모임 후 사진</span>
           <span class="phase-icon">📸</span>
         </button>
       </div>
@@ -170,7 +170,7 @@
     <header class="app-header with-back">
       <button class="back-btn" data-action="back-to-location" aria-label="뒤로가기">←</button>
       <div class="header-titles">
-        <h1 id="camera-title">사진 찍기</h1>
+        <h1 id="camera-title">사진 추가</h1>
         <p class="subtitle" id="camera-subtitle"></p>
       </div>
     </header>
@@ -181,7 +181,6 @@
         type="file"
         id="file-input"
         accept="image/*"
-        capture="environment"
         multiple
         hidden
       />
@@ -190,7 +189,7 @@
         <div class="empty-icon">📷</div>
         <p>아직 선택한 사진이 없습니다.</p>
         <button class="primary-btn" data-action="open-camera">
-          카메라로 사진 찍기
+          사진 추가
         </button>
       </div>
 
@@ -199,7 +198,7 @@
       </div>
 
       <button id="add-more-btn" class="add-more-btn hidden" data-action="open-camera">
-        + 사진 더 찍기
+        + 사진 더 추가
       </button>
     </main>
 
