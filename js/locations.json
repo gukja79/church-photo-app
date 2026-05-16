@@ -30,10 +30,13 @@
 
     { "id": "music-room",      "name": "음악실",   "floor": "음악실" },
     { "id": "music-restroom",  "name": "화장실",   "floor": "음악실" },
-    { "id": "music-hall",      "name": "복도",     "floor": "음악실" }
+    { "id": "music-hall",      "name": "복도",     "floor": "음악실" },
+
+    { "id": "auditorium-music-old", "name": "음악실(구 관악부실)", "floor": "강당" }
   ],
-  "floorOrder": ["본관 2층", "본관 3층", "본관 1층", "음악실"],
+  "floorOrder": ["강당", "본관 2층", "본관 3층", "본관 1층", "음악실"],
   "floorLabels": {
+    "강당": "강당",
     "본관 2층": "본관 2층",
     "본관 3층": "본관 3층",
     "본관 1층": "본관 1층",
